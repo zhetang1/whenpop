@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import db from "@/lib/db";
+import { sql } from "@/lib/db";
 import { nanoid } from "nanoid";
 
 export async function POST(req: NextRequest) {
@@ -17,21 +17,17 @@ export async function POST(req: NextRequest) {
 
   const pollId = nanoid(10);
 
-  db.transaction(() => {
-    db.prepare(`INSERT INTO polls (id, title, description, creator_name) VALUES (?, ?, ?, ?)`).run(
-      pollId,
-      title.trim(),
-      description?.trim() || null,
-      creator_name.trim()
-    );
+  await sql`
+    INSERT INTO polls (id, title, description, creator_name)
+    VALUES (${pollId}, ${title.trim()}, ${description?.trim() || null}, ${creator_name.trim()})
+  `;
 
-    const insertOption = db.prepare(
-      `INSERT INTO options (id, poll_id, label, sort_order) VALUES (?, ?, ?, ?)`
-    );
-    options.forEach((label, i) => {
-      insertOption.run(nanoid(8), pollId, label, i);
-    });
-  })();
+  for (let i = 0; i < options.length; i++) {
+    await sql`
+      INSERT INTO options (id, poll_id, label, sort_order)
+      VALUES (${nanoid(8)}, ${pollId}, ${options[i]}, ${i})
+    `;
+  }
 
   return NextResponse.json({ id: pollId }, { status: 201 });
 }

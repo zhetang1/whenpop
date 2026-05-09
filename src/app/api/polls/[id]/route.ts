@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import db from "@/lib/db";
+import { sql } from "@/lib/db";
 import type { Poll, Option, Participant, Vote } from "@/lib/db";
 
 export async function GET(
@@ -8,24 +8,23 @@ export async function GET(
 ) {
   const { id } = await params;
 
-  const poll = db.prepare(`SELECT * FROM polls WHERE id = ?`).get(id) as Poll | undefined;
+  const polls = await sql`SELECT * FROM polls WHERE id = ${id}`;
+  const poll = polls[0] as Poll | undefined;
   if (!poll) return NextResponse.json({ error: "Poll not found" }, { status: 404 });
 
-  const options = db
-    .prepare(`SELECT * FROM options WHERE poll_id = ? ORDER BY sort_order`)
-    .all(id) as Option[];
+  const options = await sql`
+    SELECT * FROM options WHERE poll_id = ${id} ORDER BY sort_order
+  ` as Option[];
 
-  const participants = db
-    .prepare(`SELECT * FROM participants WHERE poll_id = ? ORDER BY created_at`)
-    .all(id) as Participant[];
+  const participants = await sql`
+    SELECT * FROM participants WHERE poll_id = ${id} ORDER BY created_at
+  ` as Participant[];
 
-  const votes = db
-    .prepare(
-      `SELECT v.* FROM votes v
-       JOIN participants p ON p.id = v.participant_id
-       WHERE p.poll_id = ?`
-    )
-    .all(id) as Vote[];
+  const votes = await sql`
+    SELECT v.* FROM votes v
+    JOIN participants p ON p.id = v.participant_id
+    WHERE p.poll_id = ${id}
+  ` as Vote[];
 
   return NextResponse.json({ poll, options, participants, votes });
 }
